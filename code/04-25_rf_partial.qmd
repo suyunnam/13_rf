@@ -23,7 +23,7 @@ The methods we mentioned to overcome multicollinearity include:
     - by hand
     - by models  
 
-Today, we'll explore another model that addresses multicolinearity: **random forest**.  
+Today, we'll explore another model that addresses multicollinearity: **random forest**.  
 
 ## Random forest 
 Random forest is a very popular **supervised** “out-of-the-box” or “off-the-shelf” learning algorithm that enjoys good predictive performance with relatively little hyperparameter tuning.  
@@ -100,7 +100,7 @@ Each individual tree is made up from:
   - a bootstrapped sample of the rows  
   - at each split, a random sample of the columns  
 
-Then the forest grows by growing many indidivual trees.  
+Then the forest grows by growing many individual trees.  
 When predicting, each tree makes its own prediction.  
 
 The prediction from all trees is aggregated (averaged if regression) and the random forest provides one single predicted value.  
@@ -243,11 +243,15 @@ A given model type can be fit with different engines (e.g., through different pa
 ```{r rf_spec}
 rf_spec <- 
   # Specifying rf as our model type, asking to tune the hyperparameters
-
-    # Specify the engine
-
-    # Specifying mode  
-
+rand_forest(trees = tune(),
+            mtry = tune()) %>%
+  
+  # Specify the engine
+set_engine("ranger") %>%
+  
+  # Specifying mode  
+set_mode("regression")
+  
 rf_spec
 ```
 
@@ -296,12 +300,12 @@ set.seed(76544)
 rf_grid_result <- tune_sim_anneal(object = rf_spec,
                      preprocessor = weather_recipe,
                      resamples = resampling_foldcv,
-                    #param_info = rf_param,
                     iter = 50
                      )
 
 
 rf_grid_result
+
 rf_grid_result$.metrics[[2]]
 ```
 Notice how we have a column for iterations.  
@@ -349,27 +353,30 @@ rf_grid_result %>%
 
 ```{r}
 # Based on lowest RMSE
-best_rmse <- rf_grid_result 
+best_rmse <- rf_grid_result %>%
+  select_by_pct_loss("trees",
+                     metric = "rmse",
+                     limit = 2)
 
 best_rmse
-
 ```
 
 ```{r}
 # Based on greatest R2
-best_r2 <- rf_grid_result 
-
+best_r2 <- rf_grid_result %>%
+  select_by_pct_loss("trees",
+                     metric = "rsq",
+                     limit = 2)
 
 best_r2
-
 ```
 Based on RMSE, we would choose   
   - mtry = 24 
   - trees = 518
 
 Based on R2, we would choose   
-  - mtry = 24
-  - trees = 518
+  - mtry = 27
+  - trees = 441
 
 Let's use the hyperparameter values that optimized R2 to fit our final model.
 
@@ -377,9 +384,10 @@ Let's use the hyperparameter values that optimized R2 to fit our final model.
 final_spec <- rand_forest(trees = best_r2$trees,
                           mtry = best_r2$mtry) %>%
   # Specify the engine
-
+ set_engine("ranger",
+            importance = "permutation") %>%
     # Specifying mode  
-  set_mode("regression")
+ set_mode("regression")
   
 
 final_spec
